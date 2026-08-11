@@ -1,22 +1,36 @@
-from fastapi import Header, HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from app.config import supabase
+from typing import Annotated, Any
+
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from supabase import Client
+
+from app.config import get_supabase
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    if not credentials or not credentials.credentials:
-        raise HTTPException(status_code=401, detail="Access token required")
-    
-    token = credentials.credentials
-    
+
+async def get_current_user(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    supabase: Annotated[Client, Depends(get_supabase)],
+) -> Any:
+    if credentials is None or credentials.scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="A valid Bearer token is required.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     try:
-        user_response = supabase.auth.get_user(token)
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    if not user_response or not user_response.user:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    
-    user = user_response.user
-    return user
+        response = supabase.auth.get_user(credentials.credentials)
+        if response.user is None:
+            raise ValueError("Supabase returned no user")
+        return response.user
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="The access token is invalid or expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        ) from exc
+
+
+CurrentUser = Annotated[Any, Depends(get_current_user)]

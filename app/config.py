@@ -1,15 +1,36 @@
-import os
-from dotenv import load_dotenv
-from supabase import create_client, Client
+from functools import lru_cache
 
-load_dotenv()
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from supabase import Client, create_client
 
-SUPABASE_URL: str = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY: str = os.environ.get("SUPABASE_KEY")
 
-if not SUPABASE_URL or not SUPABASE_KEY:
-    raise RuntimeError(
-        "Missing environment variables: SUPABASE_URL, SUPABASE_KEY"
+class Settings(BaseSettings):
+    app_name: str = "Supabase Auth API"
+    app_version: str = "0.1.0"
+    supabase_url: str = Field(..., alias="SUPABASE_URL")
+    supabase_key: str = Field(..., alias="SUPABASE_KEY")
+    port: int = Field(default=8000, alias="PORT")
+    cors_origins: str = Field(default="http://localhost:3000", alias="CORS_ORIGINS")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
     )
-    
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY) # shared client across the app
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+@lru_cache
+def get_supabase() -> Client:
+    settings = get_settings()
+    return create_client(settings.supabase_url, settings.supabase_key)

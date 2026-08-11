@@ -1,22 +1,29 @@
-from fastapi import APIRouter, Depends
-from app.dependencies import get_current_user
+from fastapi import APIRouter
 
-router = APIRouter(tags=["profile"])
+from app.dependencies import CurrentUser
+from app.routers.auth import to_user_response
+from app.schemas import DashboardResponse, MessageResponse, ProfileResponse
 
-@router.get("/public/info")
-def public_info():
-    return {"message":"Welcome straight to the public profile"}
+router = APIRouter(tags=["Examples"])
 
-@router.get("/protected/profile")
-def protected_profile(current_user = Depends(get_current_user)):
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "created_at": current_user.created_at,
-    }
 
-@router.get("/protected/dashboard")
-def protected_dashboard(current_user = Depends(get_current_user)):
-    return {
-        "message": f"Welcome to the dashboard, {current_user.email}!",
-    }
+@router.get("/public/info", response_model=MessageResponse)
+def public_info() -> MessageResponse:
+    return MessageResponse(message="This endpoint is publicly accessible.")
+
+
+@router.get("/protected/profile", response_model=ProfileResponse)
+def profile(current_user: CurrentUser) -> ProfileResponse:
+    return ProfileResponse(
+        user=to_user_response(current_user),
+        message="Authenticated profile loaded successfully.",
+    )
+
+
+@router.get("/protected/dashboard", response_model=DashboardResponse)
+def dashboard(current_user: CurrentUser) -> DashboardResponse:
+    return DashboardResponse(
+        user_id=str(current_user.id),
+        message="Authenticated dashboard loaded successfully.",
+        data={"account_type": "supabase_user"},
+    )

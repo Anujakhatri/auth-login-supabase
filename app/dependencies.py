@@ -1,11 +1,14 @@
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.config import supabase
 
-def get_current_user(authorization: str = Header(default=None)):
-    if not authorization or not authorization.startswith("Bearer "):
+bearer_scheme = HTTPBearer(auto_error=False)
+
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+    if not credentials or not credentials.credentials:
         raise HTTPException(status_code=401, detail="Access token required")
     
-    token = authorization.replace("Bearer ", "")
+    token = credentials.credentials
     
     try:
         user_response = supabase.auth.get_user(token)

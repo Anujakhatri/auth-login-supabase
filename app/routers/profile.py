@@ -15,3 +15,8 @@ def protected_profile(current_user = Depends(get_current_user)):
         "created_at": current_user.created_at,
     }
 
+@router.get("/protected/dashboard")
+def protected_dashboard(current_user = Depends(get_current_user)):
+    return {
+        "message": f"Welcome to the dashboard, {current_user.email}!",
+    }
